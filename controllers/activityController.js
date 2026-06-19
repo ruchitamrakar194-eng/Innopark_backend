@@ -125,7 +125,7 @@ const createWithExtras = async (req, res) => {
             entity_type, entity_id,
             is_pinned, follow_up_at, meeting_link,
             title, assigned_to, deadline, meeting_date, meeting_time, participants,
-            call_type, duration, email_subject, email_body, recipient_email,
+            call_type, duration, reminder_minutes, email_subject, email_body, recipient_email,
             priority, start_time, end_time, phone_number
         } = req.body;
         const created_by = req.user?.id || req.body.created_by;
@@ -182,7 +182,7 @@ const createWithExtras = async (req, res) => {
             let val = assigned_to;
             if (Array.isArray(val)) val = val[0];
             else if (typeof val === 'string' && val.startsWith('[') && val.endsWith(']')) {
-                try { const p = JSON.parse(val); if (Array.isArray(p)) val = p[0]; } catch(e) { val = val.replace(/[\[\]]/g, ''); }
+                try { const p = JSON.parse(val); if (Array.isArray(p)) val = p[0]; } catch (e) { val = val.replace(/[\[\]]/g, ''); }
             }
             return (val && val !== '') ? val : null;
         })();
@@ -195,22 +195,22 @@ const createWithExtras = async (req, res) => {
         try {
             [result] = await pool.execute(
                 `INSERT INTO activities (
-                    type, title, description, reference_type, reference_id, 
-                    entity_type, entity_id,
-                    lead_id, company_id, contact_id, deal_id, 
-                    created_by, assigned_to, is_pinned, follow_up_at, 
-                    deadline, meeting_date, meeting_time, participants, meeting_link,
-                    call_type, duration, email_subject, email_body, recipient_email,
-                    priority, start_time, end_time, phone_number
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    type, title, description, reference_type, reference_id, 
+    entity_type, entity_id,
+    lead_id, company_id, contact_id, deal_id, 
+    created_by, assigned_to, is_pinned, follow_up_at, 
+    deadline, meeting_date, meeting_time, participants, meeting_link,
+    call_type, duration, reminder_minutes, email_subject, email_body, recipient_email,
+    priority, start_time, end_time, phone_number
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     type, title && title !== '' ? title : null, description && description !== '' ? description : null, entity_type, entity_id,
                     entity_type, entity_id,
                     lead_id, company_id, contact_id, deal_id,
                     creatorId, assigneeId, pinned, (follow_up_at && follow_up_at !== '') ? follow_up_at : null,
                     (deadline && deadline !== '') ? deadline : null, (meeting_date && meeting_date !== '') ? meeting_date : null, (meeting_time && meeting_time !== '') ? meeting_time : null, (participants && participants !== '') ? participants : null, (meeting_link && meeting_link !== '') ? meeting_link : null,
-                    call_type || null, duration ? parseInt(duration, 10) : 0, email_subject || null, email_body || null, recipient_email || null,
+                    call_type || null, duration ? parseInt(duration, 10) : 0, reminder_minutes !== undefined ? parseInt(reminder_minutes, 10) : 0, email_subject || null, email_body || null, recipient_email || null,
                     priority || 'medium', (start_time && start_time !== '') ? start_time : null, (end_time && end_time !== '') ? end_time : null,
                     phone_number || null
                 ]
@@ -222,7 +222,7 @@ const createWithExtras = async (req, res) => {
                 try {
                     const migrationService = require('../services/migrationService');
                     await migrationService.run();
-                    
+
                     // Retry original insert statement
                     console.log('🔄 Retrying original insert statement...');
                     [result] = await pool.execute(
@@ -309,6 +309,7 @@ const update = async (req, res) => {
                 is_pinned = COALESCE(?, is_pinned),
                 call_type = COALESCE(?, call_type),
                 duration = COALESCE(?, duration),
+                reminder_minutes = COALESCE(?, reminder_minutes),
                 email_subject = COALESCE(?, email_subject),
                 email_body = COALESCE(?, email_body),
                 recipient_email = COALESCE(?, recipient_email),
@@ -324,7 +325,7 @@ const update = async (req, res) => {
                     let val = assigned_to;
                     if (Array.isArray(val)) val = val[0];
                     else if (typeof val === 'string' && val.startsWith('[') && val.endsWith(']')) {
-                        try { const p = JSON.parse(val); if (Array.isArray(p)) val = p[0]; } catch(e) { val = val.replace(/[\[\]]/g, ''); }
+                        try { const p = JSON.parse(val); if (Array.isArray(p)) val = p[0]; } catch (e) { val = val.replace(/[\[\]]/g, ''); }
                     }
                     return (val && val !== '') ? val : null;
                 })(),
@@ -391,18 +392,18 @@ const remove = async (req, res) => {
         );
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ 
-                success: false, 
-                error: req.t ? req.t('api_msg_b58b3e72') : "Activity not found" 
+            return res.status(404).json({
+                success: false,
+                error: req.t ? req.t('api_msg_b58b3e72') : "Activity not found"
             });
         }
 
         res.json({ success: true, message: "Activity deleted successfully" });
     } catch (error) {
         console.error('Delete activity error:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: req.t ? req.t('api_msg_70743b0d') : "Failed to delete activity" 
+        res.status(500).json({
+            success: false,
+            error: req.t ? req.t('api_msg_70743b0d') : "Failed to delete activity"
         });
     }
 };

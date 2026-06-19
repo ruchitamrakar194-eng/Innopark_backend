@@ -45,8 +45,20 @@ const getAll = async (req, res) => {
         const params = [companyId];
 
         if (module) {
-            query += ' AND module = ?';
-            params.push(module);
+            if (module === 'Orders') {
+                query += ` 
+                    AND (
+                        module = ? 
+                        OR section_id IN (
+                            SELECT id FROM custom_sections 
+                            WHERE company_id = ? AND JSON_CONTAINS(shared_with, '"order"')
+                        )
+                    )`;
+                params.push(module, companyId);
+            } else {
+                query += ' AND module = ?';
+                params.push(module);
+            }
         }
 
         query += ' ORDER BY id ASC';

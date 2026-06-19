@@ -40,6 +40,7 @@ router.delete('/:lead_id/calls/:call_id', leadCallsController.deleteCall);
 router.get('/overview', leadController.getOverview);
 router.post('/bulk-action', leadController.bulkAction);
 router.post('/import', leadController.importLeads);
+router.get('/by-client/:clientId', leadController.getByClientId);
 
 // Parameterized routes (must come after specific routes)
 // More specific routes should come before less specific ones

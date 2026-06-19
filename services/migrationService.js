@@ -10,10 +10,10 @@ const migrationService = {
         try {
             // 1. Fix tasks table
             await migrationService.fixTasksTable();
-            
+
             // 2. Fix invoices table
             await migrationService.fixInvoicesTable();
-            
+
             // 3. Fix other tables (add is_deleted and company_id if missing)
             const tablesToFix = ['invoices', 'tasks', 'invoice_items', 'credit_notes', 'payments', 'activities'];
             for (const table of tablesToFix) {
@@ -49,10 +49,10 @@ const migrationService = {
             console.log('🛠️ Fixing invoices table columns...');
             // Make client_id nullable
             await pool.execute(`ALTER TABLE invoices MODIFY COLUMN client_id INT NULL DEFAULT NULL`);
-            
+
             // Fix billing_frequency truncation issues (common if it was a small ENUM or VARCHAR)
             await pool.execute(`ALTER TABLE invoices MODIFY COLUMN billing_frequency VARCHAR(50) DEFAULT NULL`);
-            
+
             // Fix discount_type (sometimes limited to '%' or 'fixed')
             await pool.execute(`ALTER TABLE invoices MODIFY COLUMN discount_type VARCHAR(20) DEFAULT '%'`);
         } catch (error) {
@@ -64,7 +64,7 @@ const migrationService = {
         try {
             // Check if 'code' column exists
             const [columns] = await pool.execute(`SHOW COLUMNS FROM tasks LIKE 'code'`);
-            
+
             if (columns.length > 0) {
                 // Column exists, make it nullable or give default
                 console.log('🛠️ Altering tasks.code to be nullable...');
@@ -167,17 +167,17 @@ const migrationService = {
             const colNames = existingCols.map(c => c.Field.toLowerCase());
 
             const columnsToAdd = [
-                { name: 'entity_type',      ddl: `ALTER TABLE activities ADD COLUMN entity_type VARCHAR(50) NULL AFTER reference_id` },
-                { name: 'entity_id',        ddl: `ALTER TABLE activities ADD COLUMN entity_id INT NULL AFTER entity_type` },
-                { name: 'call_type',        ddl: `ALTER TABLE activities ADD COLUMN call_type VARCHAR(20) NULL` },
-                { name: 'duration',         ddl: `ALTER TABLE activities ADD COLUMN duration INT NULL DEFAULT 0` },
-                { name: 'email_subject',    ddl: `ALTER TABLE activities ADD COLUMN email_subject VARCHAR(500) NULL` },
-                { name: 'email_body',       ddl: `ALTER TABLE activities ADD COLUMN email_body TEXT NULL` },
-                { name: 'recipient_email',  ddl: `ALTER TABLE activities ADD COLUMN recipient_email VARCHAR(255) NULL` },
-                { name: 'priority',         ddl: `ALTER TABLE activities ADD COLUMN priority VARCHAR(20) NULL DEFAULT 'medium'` },
-                { name: 'start_time',       ddl: `ALTER TABLE activities ADD COLUMN start_time TIME NULL` },
-                { name: 'end_time',         ddl: `ALTER TABLE activities ADD COLUMN end_time TIME NULL` },
-                { name: 'phone_number',     ddl: `ALTER TABLE activities ADD COLUMN phone_number VARCHAR(50) NULL` },
+                { name: 'entity_type', ddl: `ALTER TABLE activities ADD COLUMN entity_type VARCHAR(50) NULL AFTER reference_id` },
+                { name: 'entity_id', ddl: `ALTER TABLE activities ADD COLUMN entity_id INT NULL AFTER entity_type` },
+                { name: 'call_type', ddl: `ALTER TABLE activities ADD COLUMN call_type VARCHAR(20) NULL` },
+                { name: 'duration', ddl: `ALTER TABLE activities ADD COLUMN duration INT NULL DEFAULT 0` },
+                { name: 'email_subject', ddl: `ALTER TABLE activities ADD COLUMN email_subject VARCHAR(500) NULL` },
+                { name: 'email_body', ddl: `ALTER TABLE activities ADD COLUMN email_body TEXT NULL` },
+                { name: 'recipient_email', ddl: `ALTER TABLE activities ADD COLUMN recipient_email VARCHAR(255) NULL` },
+                { name: 'priority', ddl: `ALTER TABLE activities ADD COLUMN priority VARCHAR(20) NULL DEFAULT 'medium'` },
+                { name: 'start_time', ddl: `ALTER TABLE activities ADD COLUMN start_time TIME NULL` },
+                { name: 'end_time', ddl: `ALTER TABLE activities ADD COLUMN end_time TIME NULL` },
+                { name: 'phone_number', ddl: `ALTER TABLE activities ADD COLUMN phone_number VARCHAR(50) NULL` },
             ];
 
             // Widen reference_type column to VARCHAR(50) NULL to prevent enum truncation errors
@@ -233,11 +233,11 @@ const migrationService = {
     ensureLeadConversionSchema: async () => {
         try {
             console.log('🛠️ Ensuring lead conversion schema is aligned...');
-            
+
             // 1. Leads table: Check/Add columns
             const [leadColumns] = await pool.execute(`SHOW COLUMNS FROM leads`);
             const leadColumnNames = leadColumns.map(c => c.Field.toLowerCase());
-            
+
             if (!leadColumnNames.includes('name')) {
                 console.log('🛠️ Adding leads.name column...');
                 await pool.execute(`ALTER TABLE leads ADD COLUMN name VARCHAR(255) NULL AFTER id`);
@@ -246,11 +246,11 @@ const migrationService = {
                 console.log('🛠️ Adding leads.assigned_to column...');
                 await pool.execute(`ALTER TABLE leads ADD COLUMN assigned_to INT UNSIGNED NULL AFTER owner_id`);
             }
-            
+
             // Modify leads.status ENUM to include 'converted'
             console.log('🛠️ Modifying leads.status to support converted status...');
             await pool.execute(`ALTER TABLE leads MODIFY COLUMN status ENUM('New','Qualified','Discussion','Negotiation','Won','Lost','converted') DEFAULT 'New'`);
-            
+
             // Sync leads data
             await pool.execute(`UPDATE leads SET name = person_name WHERE name IS NULL AND person_name IS NOT NULL`);
             await pool.execute(`UPDATE leads SET assigned_to = owner_id WHERE assigned_to IS NULL AND owner_id IS NOT NULL`);
@@ -258,7 +258,7 @@ const migrationService = {
             // 2. Companies table: Check/Add company_name
             const [companyColumns] = await pool.execute(`SHOW COLUMNS FROM companies`);
             const companyColumnNames = companyColumns.map(c => c.Field.toLowerCase());
-            
+
             if (!companyColumnNames.includes('company_name')) {
                 console.log('🛠️ Adding companies.company_name column...');
                 await pool.execute(`ALTER TABLE companies ADD COLUMN company_name VARCHAR(255) NULL AFTER name`);
@@ -268,7 +268,7 @@ const migrationService = {
             // 3. Deals table: Check/Add stage and value
             const [dealColumns] = await pool.execute(`SHOW COLUMNS FROM deals`);
             const dealColumnNames = dealColumns.map(c => c.Field.toLowerCase());
-            
+
             if (!dealColumnNames.includes('stage')) {
                 console.log('🛠️ Adding deals.stage column...');
                 await pool.execute(`ALTER TABLE deals ADD COLUMN stage VARCHAR(50) NULL DEFAULT 'New' AFTER stage_id`);
@@ -279,7 +279,7 @@ const migrationService = {
             }
             await pool.execute(`UPDATE deals SET stage = 'New' WHERE stage IS NULL`);
             await pool.execute(`UPDATE deals SET value = total WHERE value IS NULL OR value = 0.00`);
-            
+
             console.log('✅ Lead conversion schema aligned successfully!');
         } catch (error) {
             console.error('❌ Lead conversion schema alignment error:', error.message);
@@ -289,7 +289,7 @@ const migrationService = {
     ensureCustomSectionsSchema: async () => {
         try {
             console.log('🛠️ Ensuring custom sections schema is aligned...');
-            
+
             // 1. Create custom_sections table if it doesn't exist
             await pool.execute(`
                 CREATE TABLE IF NOT EXISTS custom_sections (
@@ -301,15 +301,15 @@ const migrationService = {
                     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             `);
-            
+
             // 2. Add section_id to custom_fields table if it doesn't exist
             const [columns] = await pool.execute(`SHOW COLUMNS FROM custom_fields`);
             const columnNames = columns.map(c => c.Field.toLowerCase());
-            
+
             if (!columnNames.includes('section_id')) {
                 console.log('🛠️ Adding custom_fields.section_id column...');
                 await pool.execute(`ALTER TABLE custom_fields ADD COLUMN section_id INT UNSIGNED NULL AFTER company_id`);
-                
+
                 // Add foreign key constraint
                 try {
                     await pool.execute(`
@@ -321,7 +321,7 @@ const migrationService = {
                     console.warn(`⚠️ Could not add foreign key constraint on section_id: ${fkError.message}`);
                 }
             }
-            
+
             console.log('✅ Custom sections schema aligned successfully!');
         } catch (error) {
             console.error('❌ Custom sections schema alignment error:', error.message);

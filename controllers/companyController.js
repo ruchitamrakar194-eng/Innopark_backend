@@ -577,16 +577,12 @@ const deleteCompany = async (req, res) => {
     const userRole = req.user?.role || 'ADMIN';
     const companyId = req.companyId || req.query.company_id || null;
 
-    const organization = await Organization.findById(id);
-    if (!organization) {
-      return res.status(404).json({
-        success: false,
-        error: "Customer organization not found"
-      });
-    }
-
     if (userRole !== 'SUPERADMIN') {
-      if (organization._type !== 'client' || organization.company_id !== companyId) {
+      const [clients] = await pool.execute(
+        `SELECT id, company_id FROM clients WHERE id = ? AND is_deleted = 0`,
+        [id]
+      );
+      if (clients.length === 0 || clients[0].company_id !== companyId) {
         return res.status(404).json({
           success: false,
           error: "Customer organization not found"
@@ -600,7 +596,11 @@ const deleteCompany = async (req, res) => {
         [id, companyId]
       );
     } else {
-      if (organization._type !== 'company') {
+      const [companies] = await pool.execute(
+        `SELECT id FROM companies WHERE id = ? AND is_deleted = 0`,
+        [id]
+      );
+      if (companies.length === 0) {
         return res.status(404).json({
           success: false,
           error: "Company not found"

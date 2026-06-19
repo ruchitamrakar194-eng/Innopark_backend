@@ -5,6 +5,7 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const customFieldService = require('../services/customFieldService');
+const leadSyncService = require('../services/leadSyncService');
 
 /**
  * Helper function to convert ISO 8601 date string to MySQL DATE format (YYYY-MM-DD)
@@ -566,6 +567,9 @@ const create = async (req, res) => {
     // Save custom fields using service
     await customFieldService.saveCustomFields(companyId, 'Leads', leadId, custom_fields);
 
+    // Sync shared custom fields to linked orders
+    await leadSyncService.syncLeadToOrders(leadId, companyId);
+
     // Get created lead with company name and owner details
     const [leads] = await pool.execute(
       `SELECT l.*, u.name as owner_name, u.email as owner_email, c.name as tenant_name
@@ -755,6 +759,9 @@ const update = async (req, res) => {
     if (updateFields.custom_fields) {
       await customFieldService.saveCustomFields(companyId, 'Leads', id, updateFields.custom_fields);
     }
+
+    // Sync shared custom fields to linked orders
+    await leadSyncService.syncLeadToOrders(id, companyId);
 
     // Get updated lead with company name
     const [updatedLeads] = await pool.execute(
@@ -2434,6 +2441,38 @@ const removeContactFromLead = async (req, res) => {
   }
 };
 
+/**
+ * Get lead by Client ID
+ * GET /api/v1/leads/by-client/:clientId
+ */
+const getByClientId = async (req, res) => {
+    try {
+        const { clientId } = req.params;
+        const companyId = req.companyId || req.query.company_id;
+
+        if (!companyId) {
+            return res.status(400).json({ success: false, error: "company_id is required" });
+        }
+
+        const [leads] = await pool.execute(
+            'SELECT * FROM leads WHERE client_id = ? AND company_id = ? ORDER BY id DESC LIMIT 1',
+            [clientId, companyId]
+        );
+
+        if (leads.length === 0) {
+            return res.status(404).json({ success: false, error: "No lead found for this client" });
+        }
+
+        res.json({
+            success: true,
+            data: leads[0]
+        });
+    } catch (error) {
+        console.error('Get lead by client ID error:', error);
+        res.status(500).json({ success: false, error: "Failed to fetch lead by client ID" });
+    }
+};
+
 module.exports = {
   getAll,
   getById,
@@ -2458,5 +2497,6 @@ module.exports = {
   getLeadContacts,
   addContactToLead,
   removeContactFromLead,
+  getByClientId
 };
 

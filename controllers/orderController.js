@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const customFieldService = require('../services/customFieldService');
 
 /**
  * Ensure orders table exists
@@ -81,19 +82,21 @@ const getAll = async (req, res) => {
       params
     );
 
-    // Get order items for each order
-    const ordersWithItems = await Promise.all(
-      orders.map(async (order) => {
-        const [orderItems] = await pool.execute(
-          'SELECT * FROM order_items WHERE order_id = ?',
-          [order.id]
-        );
-        return {
-          ...order,
-          items: orderItems || []
-        };
-      })
-    );
+      const ordersWithItems = await Promise.all(
+        orders.map(async (order) => {
+          const [orderItems] = await pool.execute(
+            'SELECT * FROM order_items WHERE order_id = ?',
+            [order.id]
+          );
+          
+          order.custom_fields = await customFieldService.getCustomFieldsWithValues(companyId, 'Orders', order.id);
+
+          return {
+            ...order,
+            items: orderItems || []
+          };
+        })
+      );
 
     res.json({
       success: true,
@@ -154,6 +157,7 @@ const getById = async (req, res) => {
     const orderData = orders[0];
     if (orderData) {
       orderData.items = orderItems || [];
+      orderData.custom_fields = await customFieldService.getCustomFieldsWithValues(companyId, 'Orders', orderData.id);
     }
 
     res.json({
@@ -196,7 +200,7 @@ const create = async (req, res) => {
       console.log('Order items table check:', tableError.code === 'ER_TABLE_EXISTS_ERROR' ? 'exists' : tableError.message);
     }
     
-    const { title, description, amount, invoice_id, status, client_id, items = [] } = req.body;
+    const { title, description, amount, invoice_id, status, client_id, items = [], custom_fields } = req.body;
     const companyId = req.body.company_id || req.query.company_id || 1;
 
     // Removed required validations - allow empty data
@@ -287,6 +291,12 @@ const create = async (req, res) => {
       orderData.items = orderItems || [];
     }
 
+    if (custom_fields) {
+      await customFieldService.saveCustomFields(companyId, 'Orders', orderId, custom_fields);
+    }
+    
+    orderData.custom_fields = await customFieldService.getCustomFieldsWithValues(companyId, 'Orders', orderId);
+
     res.status(201).json({
       success: true,
       data: orderData,
@@ -311,6 +321,7 @@ const update = async (req, res) => {
     const { id } = req.params;
     const companyId = req.query.company_id || req.body.company_id || 1;
     const updateFields = req.body;
+    const custom_fields = updateFields.custom_fields;
 
     const [orders] = await pool.execute(
       'SELECT id FROM orders WHERE id = ? AND company_id = ? AND is_deleted = 0',
@@ -356,6 +367,12 @@ const update = async (req, res) => {
        WHERE o.id = ?`,
       [id]
     );
+
+    if (custom_fields) {
+      await customFieldService.saveCustomFields(companyId, 'Orders', id, custom_fields);
+    }
+    
+    updatedOrders[0].custom_fields = await customFieldService.getCustomFieldsWithValues(companyId, 'Orders', id);
 
     res.json({
       success: true,

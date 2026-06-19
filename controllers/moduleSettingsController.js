@@ -45,27 +45,36 @@ const ensureTableExists = async () => {
       )
     `);
     
-    // Add module_permissions column if it doesn't exist (for existing tables)
-    try {
-      // Check if column exists first
-      const [columns] = await pool.execute(`
-        SELECT COLUMN_NAME 
-        FROM INFORMATION_SCHEMA.COLUMNS 
-        WHERE TABLE_SCHEMA = DATABASE() 
-        AND TABLE_NAME = 'module_settings' 
-        AND COLUMN_NAME = 'module_permissions'
-      `);
-      
-      if (columns.length === 0) {
-        await pool.execute(`
-          ALTER TABLE module_settings 
-          ADD COLUMN module_permissions JSON
+    // Ensure JSON columns exist for existing tables
+      try {
+        // Get existing column names
+        const [existingColumns] = await pool.execute(`
+          SELECT COLUMN_NAME 
+          FROM INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'module_settings'
         `);
+        const columnNames = existingColumns.map(col => col.COLUMN_NAME);
+
+        // employee_menus column
+        if (!columnNames.includes('employee_menus')) {
+          await pool.execute(`
+            ALTER TABLE module_settings 
+            ADD COLUMN employee_menus JSON
+          `);
+          console.log('Added missing employee_menus column');
+        }
+        // module_permissions column
+        if (!columnNames.includes('module_permissions')) {
+          await pool.execute(`
+            ALTER TABLE module_settings 
+            ADD COLUMN module_permissions JSON
+          `);
+          console.log('Added missing module_permissions column');
+        }
+      } catch (alterError) {
+        console.log('Column check error:', alterError.message);
       }
-    } catch (alterError) {
-      // Column might already exist, ignore error
-      console.log('Note: module_permissions column check:', alterError.message);
-    }
     
     return true;
   } catch (error) {
@@ -83,7 +92,7 @@ const getModuleSettings = async (req, res) => {
     await ensureTableExists();
 
     const companyId = req.query.company_id || req.user?.company_id;
-    
+    console.log('getModuleSettings: companyId', companyId);
     if (!companyId) {
       return res.status(400).json({
         success: false,

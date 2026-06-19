@@ -5,10 +5,10 @@
 
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('../middleware/auth');
+const { optionalAuth } = require('../middleware/auth');
 const moduleSettingsController = require('../controllers/moduleSettingsController');
 
-router.use(verifyToken);
+router.use(optionalAuth);
 
 router.get('/', moduleSettingsController.getModuleSettings);
 router.put('/', moduleSettingsController.updateModuleSettings);

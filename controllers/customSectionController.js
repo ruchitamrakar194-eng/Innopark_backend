@@ -20,7 +20,11 @@ const getAll = async (req, res) => {
         const params = [companyId];
 
         if (module) {
-            query += ' AND module_name = ?';
+            if (module === 'Orders') {
+                query += ` AND (module_name = ? OR JSON_CONTAINS(shared_with, '"order"'))`;
+            } else {
+                query += ' AND module_name = ?';
+            }
             params.push(module);
         }
 
@@ -88,7 +92,7 @@ const getById = async (req, res) => {
  */
 const create = async (req, res) => {
     try {
-        const { module_name, section_name } = req.body;
+        const { module_name, section_name, shared_with } = req.body;
         const companyId = req.companyId || req.body.company_id;
 
         if (!companyId) {
@@ -105,9 +109,11 @@ const create = async (req, res) => {
             });
         }
 
+        const sharedJson = shared_with ? JSON.stringify(shared_with) : '[]';
+
         const [result] = await pool.execute(
-            `INSERT INTO custom_sections (company_id, module_name, section_name) VALUES (?, ?, ?)`,
-            [companyId, module_name, section_name.trim()]
+            `INSERT INTO custom_sections (company_id, module_name, section_name, shared_with) VALUES (?, ?, ?, ?)`,
+            [companyId, module_name, section_name.trim(), sharedJson]
         );
 
         res.status(201).json({
@@ -136,7 +142,7 @@ const create = async (req, res) => {
 const update = async (req, res) => {
     try {
         const { id } = req.params;
-        const { section_name } = req.body;
+        const { section_name, shared_with } = req.body;
         const companyId = req.companyId || req.body.company_id || req.query.company_id;
 
         if (!companyId) {
@@ -153,10 +159,18 @@ const update = async (req, res) => {
             });
         }
 
-        const [result] = await pool.execute(
-            `UPDATE custom_sections SET section_name = ? WHERE id = ? AND company_id = ?`,
-            [section_name.trim(), id, companyId]
-        );
+        let updateQuery = `UPDATE custom_sections SET section_name = ?`;
+        let queryParams = [section_name.trim()];
+
+        if (shared_with !== undefined) {
+            updateQuery += `, shared_with = ?`;
+            queryParams.push(JSON.stringify(shared_with));
+        }
+
+        updateQuery += ` WHERE id = ? AND company_id = ?`;
+        queryParams.push(id, companyId);
+
+        const [result] = await pool.execute(updateQuery, queryParams);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
