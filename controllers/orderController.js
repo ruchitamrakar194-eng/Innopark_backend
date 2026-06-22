@@ -38,10 +38,10 @@ const ensureTableExists = async () => {
 const getAll = async (req, res) => {
   try {
     await ensureTableExists();
-    
+
     const { status, client_id } = req.query;
     const companyId = req.query.company_id || req.body.company_id || 1;
-    
+
     let whereClause = 'WHERE o.company_id = ? AND o.is_deleted = 0';
     const params = [companyId];
 
@@ -52,7 +52,7 @@ const getAll = async (req, res) => {
         'SELECT id FROM clients WHERE (owner_id = ? OR id = ?) AND company_id = ? AND is_deleted = 0 LIMIT 1',
         [client_id, client_id, companyId]
       );
-      
+
       if (clients.length > 0) {
         // If client record found, filter by client_id
         whereClause += ' AND (o.client_id = ? OR o.client_id IS NULL)';
@@ -82,21 +82,21 @@ const getAll = async (req, res) => {
       params
     );
 
-      const ordersWithItems = await Promise.all(
-        orders.map(async (order) => {
-          const [orderItems] = await pool.execute(
-            'SELECT * FROM order_items WHERE order_id = ?',
-            [order.id]
-          );
-          
-          order.custom_fields = await customFieldService.getCustomFieldsWithValues(companyId, 'Orders', order.id);
+    const ordersWithItems = await Promise.all(
+      orders.map(async (order) => {
+        const [orderItems] = await pool.execute(
+          'SELECT * FROM order_items WHERE order_id = ?',
+          [order.id]
+        );
 
-          return {
-            ...order,
-            items: orderItems || []
-          };
-        })
-      );
+        order.custom_fields = await customFieldService.getCustomFieldsWithValues(companyId, 'Orders', order.id);
+
+        return {
+          ...order,
+          items: orderItems || []
+        };
+      })
+    );
 
     res.json({
       success: true,
@@ -106,10 +106,10 @@ const getAll = async (req, res) => {
     console.error('Get orders error (serving mock data):', error.message);
     // Return high-quality professional mock orders if DB is down
     const mockOrders = [
-      { id: 701, title: "Hardware Procurement", client_name: "TechNova Solutions", amount: 15400.00, status: "Completed", order_date: new Date(), items: [{item_name: "Laptops", quantity: 5, amount: 12000}] },
-      { id: 702, title: "Software Licenses", client_name: "Creative Mint", amount: 2500.00, status: "Processing", order_date: new Date(), items: [{item_name: "Adobe CC", quantity: 3, amount: 2500}] },
-      { id: 703, title: "Office Furniture", client_name: "Elite Realty", amount: 8900.00, status: "Shipped", order_date: new Date(), items: [{item_name: "Ergonomic Chairs", quantity: 10, amount: 8900}] },
-      { id: 704, title: "Marketing Collateral", client_name: "Alpha Corp", amount: 1200.00, status: "New", order_date: new Date(), items: [{item_name: "Banners", quantity: 2, amount: 1200}] }
+      { id: 701, title: "Hardware Procurement", client_name: "TechNova Solutions", amount: 15400.00, status: "Completed", order_date: new Date(), items: [{ item_name: "Laptops", quantity: 5, amount: 12000 }] },
+      { id: 702, title: "Software Licenses", client_name: "Creative Mint", amount: 2500.00, status: "Processing", order_date: new Date(), items: [{ item_name: "Adobe CC", quantity: 3, amount: 2500 }] },
+      { id: 703, title: "Office Furniture", client_name: "Elite Realty", amount: 8900.00, status: "Shipped", order_date: new Date(), items: [{ item_name: "Ergonomic Chairs", quantity: 10, amount: 8900 }] },
+      { id: 704, title: "Marketing Collateral", client_name: "Alpha Corp", amount: 1200.00, status: "New", order_date: new Date(), items: [{ item_name: "Banners", quantity: 2, amount: 1200 }] }
     ];
     res.json({
       success: true,
@@ -177,7 +177,7 @@ const getById = async (req, res) => {
 const create = async (req, res) => {
   try {
     await ensureTableExists();
-    
+
     // Create order_items table if it doesn't exist
     try {
       await pool.execute(`
@@ -199,7 +199,7 @@ const create = async (req, res) => {
       // Table might already exist
       console.log('Order items table check:', tableError.code === 'ER_TABLE_EXISTS_ERROR' ? 'exists' : tableError.message);
     }
-    
+
     const { title, description, amount, invoice_id, status, client_id, items = [], custom_fields } = req.body;
     const companyId = req.body.company_id || req.query.company_id || 1;
 
@@ -294,7 +294,7 @@ const create = async (req, res) => {
     if (custom_fields) {
       await customFieldService.saveCustomFields(companyId, 'Orders', orderId, custom_fields);
     }
-    
+
     orderData.custom_fields = await customFieldService.getCustomFieldsWithValues(companyId, 'Orders', orderId);
 
     res.status(201).json({
@@ -304,8 +304,8 @@ const create = async (req, res) => {
     });
   } catch (error) {
     console.error('Create order error:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: req.t ? req.t('api_msg_0f5c01a5') : "Failed to create order",
       details: error.message
     });
@@ -371,7 +371,7 @@ const update = async (req, res) => {
     if (custom_fields) {
       await customFieldService.saveCustomFields(companyId, 'Orders', id, custom_fields);
     }
-    
+
     updatedOrders[0].custom_fields = await customFieldService.getCustomFieldsWithValues(companyId, 'Orders', id);
 
     res.json({
@@ -428,7 +428,7 @@ const updateStatus = async (req, res) => {
        FROM orders o
        LEFT JOIN clients c ON o.client_id = c.id
        WHERE o.id = ?`,
-       [id]
+      [id]
     );
 
     // Save history
@@ -557,12 +557,12 @@ const getPDF = async (req, res) => {
   }
 };
 
-module.exports = { 
-  getAll, 
-  getById, 
-  create, 
-  update, 
-  updateStatus, 
+module.exports = {
+  getAll,
+  getById,
+  create,
+  update,
+  updateStatus,
   delete: deleteOrder,
   getPDF
 };
