@@ -48,6 +48,8 @@ router.get('/:id/contacts', leadController.getLeadContacts);
 router.post('/:id/contacts', leadController.addContactToLead);
 router.delete('/:id/contacts/:contactId', leadController.removeContactFromLead);
 
+router.post('/:id/items', leadController.saveLeadItems);
+
 router.put('/:id/update-status', leadController.updateStatus);
 router.put('/:id/labels', leadController.updateLeadLabels);
 router.post('/:id/convert', leadController.convertLead);

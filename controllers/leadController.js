@@ -120,7 +120,7 @@ const sanitizeInteger = (intValue) => {
  * GET /api/v1/leads
  */
 // Helper to replace nulls with empty strings/zeros
-const LEAD_STATUS_ALLOWED = ['New', 'Qualified', 'Discussion', 'Negotiation', 'Won', 'Lost', 'converted', 'Converted'];
+const LEAD_STATUS_ALLOWED = ['New', 'Contacted', 'Email Inquiry', 'Qualified', 'Converted', 'Research', 'Lost', 'Discussion', 'Negotiation', 'Won', 'converted', 'Dokumente vorbereiten', 'Rechnung', 'In Arbeit', 'Abschlussrechnung'];
 const normalizeLeadStatus = (status) => {
   if (!status || typeof status !== 'string') return 'New';
   const s = String(status).trim();
@@ -133,7 +133,18 @@ const normalizeLeadStatus = (status) => {
   // Map German/Other translations back to English ENUM
   const map = {
     'neu': 'New',
+    'neuer lead': 'New',
+    'dokumente vorbereiten': 'Dokumente vorbereiten',
+    'rechnung': 'Rechnung',
+    'in arbeit': 'In Arbeit',
+    'abschlussrechnung': 'Abschlussrechnung',
+    'auftrag bekommen': 'Won',
+    'auftrag nicht bekommen': 'Lost',
+    'kontaktiert': 'Contacted',
+    'e-mail-anfrage': 'Email Inquiry',
     'qualifiziert': 'Qualified',
+    'konvertiert': 'Converted',
+    'recherche': 'Research',
     'diskussion': 'Discussion',
     'verhandlung': 'Negotiation',
     'gewonnen': 'Won',
@@ -400,6 +411,18 @@ const getById = async (req, res) => {
 
     // Get custom fields using service
     lead.custom_fields = await customFieldService.getCustomFieldsWithValues(companyId, 'Leads', lead.id);
+
+    // Get lead items (products)
+    try {
+      const [leadItems] = await pool.execute(
+        `SELECT * FROM lead_items WHERE lead_id = ?`,
+        [lead.id]
+      );
+      lead.items = leadItems || [];
+    } catch (e) {
+      console.error('Error fetching lead items:', e);
+      lead.items = [];
+    }
 
     res.json({
       success: true,
@@ -2473,6 +2496,62 @@ const getByClientId = async (req, res) => {
     }
 };
 
+/**
+ * Save lead items (products)
+ * POST /api/v1/leads/:id/items
+ */
+const saveLeadItems = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { items } = req.body;
+    const companyId = req.companyId || req.query.company_id || req.body.company_id || 1;
+
+    // Check if lead exists
+    const [leads] = await pool.execute(
+      `SELECT id FROM leads WHERE id = ? AND company_id = ? AND is_deleted = 0`,
+      [id, companyId]
+    );
+
+    if (leads.length === 0) {
+      return res.status(404).json({ success: false, error: "Lead not found" });
+    }
+
+    // Delete existing items
+    await pool.execute('DELETE FROM lead_items WHERE lead_id = ?', [id]);
+
+    // Insert new items
+    if (items && Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        await pool.execute(
+          `INSERT INTO lead_items (
+            lead_id, item_id, item_name, description, quantity, unit, unit_price, tax, tax_rate, amount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            item.item_id || item.id || null,
+            item.item_name || item.name || item.title || 'Unknown Item',
+            item.description || null,
+            item.quantity || 1,
+            item.unit || null,
+            item.unit_price || item.rate || item.price || 0,
+            item.tax || 0,
+            item.tax_rate || 0,
+            item.amount || ((item.quantity || 1) * (item.unit_price || item.rate || item.price || 0))
+          ]
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "Lead items saved successfully"
+    });
+  } catch (error) {
+    console.error('Save lead items error:', error);
+    res.status(500).json({ success: false, error: "Failed to save lead items" });
+  }
+};
+
 module.exports = {
   getAll,
   getById,
@@ -2497,6 +2576,7 @@ module.exports = {
   getLeadContacts,
   addContactToLead,
   removeContactFromLead,
-  getByClientId
+  getByClientId,
+  saveLeadItems
 };
 
